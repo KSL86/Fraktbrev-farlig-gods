@@ -292,7 +292,7 @@ function HazardLabelsPage({ dgItems, labels, labelCount }) {
   const pages = [];
   for (let p = 0; p < labelCount; p++) { pages.push(p); }
 
-  return pages.map(pageIdx => (
+  return (<>{pages.map(pageIdx => (
     <div key={`labels-${pageIdx}`} style={{width:780,margin:"0 auto",background:"#fff",border:"1.2px solid #222",padding:"30px 40px",pageBreakBefore:pageIdx>0?"always":"auto",pageBreakAfter:"always"}}>
       <div style={{fontSize:16,fontWeight:900,marginBottom:4,letterSpacing:1}}>FAREMERKER / KOLLI-ETIKETTER</div>
       <div style={{fontSize:9,color:"#777",marginBottom:20}}>Ark {pageIdx+1} av {labelCount} · Klipp ut og fest på kolli iht. ADR 5.2</div>
@@ -374,7 +374,7 @@ function HazardLabelsPage({ dgItems, labels, labelCount }) {
         </div>
       )}
     </div>
-  ));
+  ))}</>);
 }
 
 // ===================== SINGLE WAYBILL PAGE =====================
@@ -519,12 +519,25 @@ function PrintWrapper({ data, config, onBack }) {
   const activeCopies = copyDefs.filter(c => config.copies[c.key]);
   const hasLabels = Object.entries(config.labels).some(([k,v])=>v);
 
+  const doPrint = () => {
+    try { window.print(); } catch(e) { alert("Utskrift er ikke tilgjengelig i denne visningen. Last ned prosjektet og kjør det lokalt eller på en webserver for å bruke utskriftsfunksjonen."); }
+  };
+
+  if (activeCopies.length === 0 && !hasLabels) {
+    return (
+      <div style={{fontFamily:"sans-serif",padding:40,textAlign:"center"}}>
+        <p>Ingen kopier eller etiketter er valgt.</p>
+        <button onClick={onBack} style={{marginTop:16,background:"#333",color:"#fff",border:"none",borderRadius:6,padding:"10px 24px",cursor:"pointer"}}>← Tilbake</button>
+      </div>
+    );
+  }
+
   return (
     <div style={{fontFamily:"'Helvetica Neue',Helvetica,Arial,sans-serif",color:"#111",background:"#e8e8e4",minHeight:"100vh"}}>
       <div className="no-print" style={{padding:"12px 20px",display:"flex",gap:10,background:"#1a1a2e",flexWrap:"wrap"}}>
         <button onClick={onBack} style={{background:"#333",color:"#fff",border:"none",borderRadius:6,padding:"8px 20px",cursor:"pointer",fontWeight:600,fontSize:13}}>← Tilbake</button>
-        <button onClick={()=>window.print()} style={{background:"linear-gradient(135deg,#e5a100,#c89200)",color:"#1a1a2e",border:"none",borderRadius:6,padding:"8px 24px",cursor:"pointer",fontWeight:800,fontSize:13}}>⎙ Skriv ut / PDF</button>
-        <span style={{color:"#fff",fontSize:12,opacity:0.7,alignSelf:"center"}}>{activeCopies.length} fraktbrev + {hasLabels?config.labelCount:0} etikettark</span>
+        <button onClick={doPrint} style={{background:"linear-gradient(135deg,#e5a100,#c89200)",color:"#1a1a2e",border:"none",borderRadius:6,padding:"8px 24px",cursor:"pointer",fontWeight:800,fontSize:13}}>⎙ Skriv ut / PDF</button>
+        <span style={{color:"#fff",fontSize:12,opacity:0.7,alignSelf:"center"}}>{activeCopies.length} fraktbrev{hasLabels?` + ${config.labelCount} etikettark`:""}</span>
       </div>
 
       <div style={{padding:"16px 0"}}>
@@ -693,8 +706,17 @@ export default function App() {
     if (validation.allOk) setView("config");
   };
 
-  if(view==="config") return <PrintConfig data={{sender,receiver,shipment,goods,dgItems,altDelivery,useAltDelivery}} onBack={()=>setView("form")} onPrint={(cfg)=>{setPrintConfig(cfg);setView("print");}}/>;
-  if(view==="print"&&printConfig) return <PrintWrapper data={{sender,receiver,shipment,goods,dgItems,altDelivery,useAltDelivery}} config={printConfig} onBack={()=>setView("config")}/>;
+  const handlePrint = useCallback((cfg) => {
+    setPrintConfig(cfg);
+    // Use timeout to ensure state is set before view switch
+    setTimeout(() => setView("print"), 0);
+  }, []);
+
+  if(view==="config") return <PrintConfig data={{sender,receiver,shipment,goods,dgItems,altDelivery,useAltDelivery}} onBack={()=>setView("form")} onPrint={handlePrint}/>;
+  if(view==="print") {
+    if(!printConfig) return <div style={{padding:40,textAlign:"center",fontFamily:"sans-serif"}}>Laster utskrift...</div>;
+    return <PrintWrapper data={{sender,receiver,shipment,goods,dgItems,altDelivery,useAltDelivery}} config={printConfig} onBack={()=>setView("config")}/>;
+  }
 
   const errBorder = "1.5px solid #e74c3c";
   const errBg = "#fef2f2";
